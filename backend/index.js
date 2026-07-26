@@ -12,12 +12,20 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
+const patients = [
+  { id: 'p1', name: 'John Carter', room: '204A' },
+  { id: 'p2', name: 'Amina Yusuf', room: '207B' },
+  { id: 'p3', name: 'Wei Zhang', room: '211A' },
+];
+
 io.on('connection', (socket) => {
   console.log('A client connected:', socket.id);
 
   const interval = setInterval(() => {
-    const vitals = generateVitals();
-    socket.emit('vitals-update', vitals);
+    patients.forEach((patient) => {
+      const vitals = generateVitals();
+      socket.emit('vitals-update', { ...patient, ...vitals });
+    });
   }, 2000);
 
   socket.on('disconnect', () => {
@@ -28,9 +36,9 @@ io.on('connection', (socket) => {
 
 function generateVitals() {
   return {
-    heartRate: Math.floor(60 + Math.random() * 40), // 60–100 bpm
-    spo2: Math.floor(95 + Math.random() * 5), // 95–100%
-    temperature: (36.5 + Math.random() * 1.5).toFixed(1), // 36.5–38.0 °C
+    heartRate: Math.floor(55 + Math.random() * 55),
+    spo2: Math.floor(90 + Math.random() * 10),
+    temperature: +(36.2 + Math.random() * 2.3).toFixed(1),
     timestamp: new Date().toISOString(),
   };
 }
