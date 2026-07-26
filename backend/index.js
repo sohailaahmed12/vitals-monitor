@@ -2,7 +2,9 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-
+require('dotenv').config();
+const mongoose = require('mongoose');
+const Reading = require('./Reading');
 const app = express();
 app.use(cors());
 
@@ -11,6 +13,10 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
 });
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch((err) => console.error('MongoDB connection error:', err));
 
 const patients = [
   { id: 'p1', name: 'John Carter', room: '204A' },
@@ -22,11 +28,26 @@ io.on('connection', (socket) => {
   console.log('A client connected:', socket.id);
 
   const interval = setInterval(() => {
-    patients.forEach((patient) => {
-      const vitals = generateVitals();
-      socket.emit('vitals-update', { ...patient, ...vitals });
-    });
-  }, 2000);
+  patients.forEach(async (patient) => {
+    const vitals = generateVitals();
+    const readingData = { ...patient, ...vitals };
+
+    socket.emit('vitals-update', readingData);
+
+    try {
+      await new Reading({
+        patientId: patient.id,
+        name: patient.name,
+        room: patient.room,
+        heartRate: vitals.heartRate,
+        spo2: vitals.spo2,
+        temperature: vitals.temperature,
+      }).save();
+    } catch (err) {
+      console.error('Failed to save reading:', err);
+    }
+  });
+}, 2000);
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -42,6 +63,16 @@ function generateVitals() {
     timestamp: new Date().toISOString(),
   };
 }
+
+app.use(express.json());
+
+app.get('/api/readings/:patientId', async (req, res) => {
+  const readings = await Reading.find({ patientId: req.params.patientId })
+    .sort({ timestamp: -1 })
+    .limit(50);
+  res.json(readings);
+});
+
 
 server.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
