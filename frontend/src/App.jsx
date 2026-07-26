@@ -6,20 +6,17 @@ const socket = io('http://localhost:3000');
 
 function App() {
   const [connected, setConnected] = useState(false);
+  const [vitals, setVitals] = useState(null);
 
   useEffect(() => {
-    socket.on('connect', () => {
-      setConnected(true);
-      console.log('Connected with id:', socket.id);
-    });
-
-    socket.on('disconnect', () => {
-      setConnected(false);
-    });
+    socket.on('connect', () => setConnected(true));
+    socket.on('disconnect', () => setConnected(false));
+    socket.on('vitals-update', (data) => setVitals(data));
 
     return () => {
       socket.off('connect');
       socket.off('disconnect');
+      socket.off('vitals-update');
     };
   }, []);
 
@@ -27,6 +24,16 @@ function App() {
     <div className="page">
       <h1>Vitals Monitor</h1>
       <p>Socket status: {connected ? 'Connected ✅' : 'Disconnected ❌'}</p>
+
+      {vitals ? (
+        <div className="vitals">
+          <p>Heart rate: {vitals.heartRate} bpm</p>
+          <p>SpO2: {vitals.spo2}%</p>
+          <p>Temperature: {vitals.temperature}°C</p>
+        </div>
+      ) : (
+        <p>Waiting for data...</p>
+      )}
     </div>
   );
 }
