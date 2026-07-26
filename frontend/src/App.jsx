@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import './App.css';
+import PatientHistoryModal from './PatientHistoryModal';
 
 const API_URL = 'http://localhost:3000';
 const MAX_HISTORY = 15;
@@ -24,6 +25,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [authMode, setAuthMode] = useState('login');
   const [error, setError] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState(null);
 
   const [connected, setConnected] = useState(false);
   const [patients, setPatients] = useState({});
@@ -56,6 +58,12 @@ function App() {
     } catch (err) {
       setError('Could not reach server');
     }
+  }
+    function handleLogout() {
+    setToken(null);
+    setPatients({});
+    setEmail('');
+    setPassword('');
   }
 
   useEffect(() => {
@@ -109,57 +117,92 @@ function App() {
   const patientList = Object.values(patients);
 
   return (
-    <div className="page">
-      <header className="dashboard-header">
-        <h1>Vitals monitor</h1>
-        <span className={`status-dot ${connected ? 'online' : 'offline'}`}>
-          {connected ? 'Live' : 'Disconnected'}
-        </span>
+  <div className="app-shell">
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">V</div>
+        <span>Vitals</span>
+      </div>
+      <nav className="nav-status">
+        <span className={`status-dot ${connected ? 'online' : 'offline'}`} />
+        <span>{connected ? 'Live' : 'Disconnected'}</span>
+      </nav>
+      <button className="logout-btn" onClick={handleLogout}>
+        Log out
+      </button>
+    </aside>
+
+    <main className="main-content">
+      <header className="content-header">
+        <div>
+          <h1>Patient monitoring</h1>
+          <p className="content-subtitle">{patientList.length} patients · real-time</p>
+        </div>
       </header>
 
       {patientList.length === 0 ? (
         <p className="waiting">Waiting for data...</p>
       ) : (
         <div className="patients-grid">
-          {patientList.map((p) => <PatientCard key={p.id} patient={p} />)}
+          {patientList.map((p) => (
+            <PatientCard key={p.id} patient={p} onClick={() => setSelectedPatient(p)} />
+          ))}
         </div>
       )}
-    </div>
-  );
+    </main>
+
+    {selectedPatient && (
+      <PatientHistoryModal
+        patient={selectedPatient}
+        token={token}
+        onClose={() => setSelectedPatient(null)}
+      />
+    )}
+  </div>
+);
 }
 
-function PatientCard({ patient }) {
+function PatientCard({ patient, onClick }) {
   const hrStatus = getStatus('heartRate', patient.heartRate);
   const spo2Status = getStatus('spo2', patient.spo2);
   const tempStatus = getStatus('temperature', patient.temperature);
   const hasAlert = [hrStatus, spo2Status, tempStatus].includes('alert');
 
   return (
-    <div className={`patient-card ${hasAlert ? 'alert-border' : ''}`}>
+    <div className={`patient-card ${hasAlert ? 'alert-border' : ''}`} onClick={onClick}>
       <div className="patient-header">
+        <div className="patient-avatar">{patient.name.charAt(0)}</div>
         <div>
           <p className="patient-name">{patient.name}</p>
           <p className="patient-room">Room {patient.room}</p>
         </div>
         {hasAlert && <span className="alert-badge">Alert</span>}
       </div>
+
       <div className="vitals-row">
-        <VitalBlock label="HR" value={patient.heartRate} unit="bpm" status={hrStatus} />
+        <VitalBlock label="Heart rate" value={patient.heartRate} unit="bpm" status={hrStatus} />
         <VitalBlock label="SpO2" value={patient.spo2} unit="%" status={spo2Status} />
         <VitalBlock label="Temp" value={patient.temperature} unit="°C" status={tempStatus} />
       </div>
+
       <div className="chart-wrap">
-        <ResponsiveContainer width="100%" height={60}>
+        <ResponsiveContainer width="100%" height={50}>
           <LineChart data={patient.history}>
             <YAxis domain={['dataMin - 5', 'dataMax + 5']} hide />
-            <Line type="monotone" dataKey="heartRate" stroke={hrStatus === 'alert' ? '#f87171' : '#4ade80'} strokeWidth={2} dot={false} isAnimationActive={false} />
+            <Line
+              type="monotone"
+              dataKey="heartRate"
+              stroke={hrStatus === 'alert' ? '#f87171' : '#818cf8'}
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
     </div>
   );
 }
-
 function VitalBlock({ label, value, unit, status }) {
   return (
     <div className={`vital-block ${status}`}>
